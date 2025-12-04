@@ -58,10 +58,13 @@ RSpec.describe Yabeda::ActiveJob, type: :integration do
     describe "job latency calculation" do
       # Rails 7.1.4 and above
       it "measures correct latency from end_time in seconds", queue_adapter: :test do
-        start_time = Time.now
+        base_time = Time.now
+
+        # Mock the job's enqueued_at time to be exactly base_time
+        allow_any_instance_of(HelloJob).to receive(:enqueued_at).and_return(base_time) # rubocop:disable RSpec/AnyInstance
 
         # Mock the event end time to simulate 60 seconds later
-        allow_any_instance_of(ActiveSupport::Notifications::Event).to receive(:end).and_return(1.minute.from_now(start_time).to_f) # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ActiveSupport::Notifications::Event).to receive(:end).and_return((base_time + 60.seconds).to_f) # rubocop:disable RSpec/AnyInstance
 
         expect { HelloJob.perform_later }.to have_enqueued_job.on_queue("default")
         expect { perform_enqueued_jobs }.to measure_yabeda_histogram(Yabeda.activejob.latency)
@@ -71,10 +74,13 @@ RSpec.describe Yabeda::ActiveJob, type: :integration do
 
       # Rails 7.1.3 and below
       it "measures correct latency from end_time in milliseconds", queue_adapter: :test do
-        start_time = Time.now
+        base_time = Time.now
+
+        # Mock the job's enqueued_at time to be exactly base_time
+        allow_any_instance_of(HelloJob).to receive(:enqueued_at).and_return(base_time) # rubocop:disable RSpec/AnyInstance
 
         # Mock the event end time to simulate 60 seconds later (in milliseconds)
-        allow_any_instance_of(ActiveSupport::Notifications::Event).to receive(:end).and_return(1.minute.from_now(start_time).to_f * 1000) # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ActiveSupport::Notifications::Event).to receive(:end).and_return((base_time + 60.seconds).to_f * 1000) # rubocop:disable RSpec/AnyInstance
 
         expect { HelloJob.perform_later }.to have_enqueued_job.on_queue("default")
         expect { perform_enqueued_jobs }.to measure_yabeda_histogram(Yabeda.activejob.latency)
@@ -197,7 +203,7 @@ RSpec.describe Yabeda::ActiveJob, type: :integration do
     end
   end
 
-  context "when jobs are bulk enqueued", skip: !ActiveJob.respond_to?(:perform_all_later), queue_adapter: :test do
+  context "when jobs are bulk enqueued", queue_adapter: :test, skip: !ActiveJob.respond_to?(:perform_all_later) do
     it "increments enqueued job counter for all jobs" do
       expect do
         ActiveJob.perform_all_later([HelloJob.new, HelloJob.new, LongJob.new])
@@ -213,10 +219,10 @@ RSpec.describe Yabeda::ActiveJob, type: :integration do
     it "increments scheduled job counter for scheduled jobs in bulk" do
       expect do
         ActiveJob.perform_all_later([
-          HelloJob.new.set(wait: 1.hour),
-          HelloJob.new,
-          LongJob.new.set(wait: 2.hours),
-        ])
+                                      HelloJob.new.set(wait: 1.hour),
+                                      HelloJob.new,
+                                      LongJob.new.set(wait: 2.hours),
+                                    ])
       end.to increment_yabeda_counter(Yabeda.activejob.scheduled_total)
         .with_tags(queue: "default", activejob: "HelloJob", executions: "0")
         .by(1).and(
