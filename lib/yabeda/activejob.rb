@@ -67,6 +67,21 @@ module Yabeda
         end
       end
     end
+
+    def self.configure_good_job_metrics
+      Yabeda.configure do
+        group :activejob
+
+        gauge :queued, tags: %i[queue], comment: "Current number of queued jobs"
+
+        collect do
+          queued_count_by_queue = GoodJob::Job.queued.group(:queue_name).size
+          queues = Set.new(activejob.queued.values.map { |tags, _| tags[:queue] }).merge(queued_count_by_queue.keys)
+          # Ensure that the gauge value is reset to zero for queues with no queued jobs.
+          queues.each { |queue| activejob.queued.set({ queue: queue }, queued_count_by_queue.fetch(queue, 0)) }
+        end
+      end
+    end
     # rubocop: enable Metrics/MethodLength, Metrics/BlockLength, Metrics/AbcSize
   end
 end

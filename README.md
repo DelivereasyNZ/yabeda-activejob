@@ -64,6 +64,14 @@ end
 
 **Note**: Since the notifications are registered on install make sure to setup your after_event_block before calling install!
 
+### Enabling GoodJob metrics
+
+Metrics specific to GoodJob can be enabled with:
+```ruby
+# config/initializers/yabeda.rb or elsewhere
+Yabeda::ActiveJob.configure_good_job_metrics
+```
+
 ## Metrics
 
 - Total enqueued jobs: `activejob.enqueued_total` segmented by: queue, activejob(job class name), executions(number of executions)
@@ -72,6 +80,10 @@ end
 - Total failed jobs processed: `activejob.failed_total` segmented by: queue, activejob(job class name), executions(number of executions), failure_reason(error class)
 - Job runtime: `activejob.runtime` (in seconds)
 - Job latency: `activejob.latency` (in seconds)
+
+### GoodJob Metrics
+
+- Current number of queued jobs: `activejob.queued` segmented by: queue
 
 ## Contributing
 
